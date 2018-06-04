@@ -1,0 +1,99 @@
+//Importing Scala Libraries for Real time streaming and OpenTSDB.
+
+
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.spark.streaming.kafka09.KafkaUtils
+import org.apache.spark.streaming.kafka09.LocationStrategies.PreferConsistent
+import org.apache.spark.streaming.kafka09.ConsumerStrategies.Subscribe
+import org.apache.spark.SparkConf
+import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.storage.StorageLevel
+import org.apache.spark.SparkContext
+import org.apache.spark.streaming.kafka09.{ConsumerStrategies, KafkaUtils, LocationStrategies}
+import org.apache.kafka.clients.consumer.ConsumerConfig
+import java.util.Properties
+import org.apache.spark.streaming.kafka.producer._
+import org.apache.kafka.clients.producer.ProducerConfig
+import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.clients.producer.KafkaProducer
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SaveMode
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.SaveMode
+import com.mapr.db.spark.sql._
+import org.json4s.jackson.JsonMethods.{compact, render}
+import scala.util.control.NonFatal
+import org.joda.time.DateTime
+import scala.util.control.NonFatal
+import org.apache.log4j.Logger
+import org.apache.spark.streaming.dstream.DStream
+import org.apache.http.client.methods.HttpPost
+import org.apache.http.entity.StringEntity
+import org.apache.http.impl.client.DefaultHttpClient
+import org.json4s._
+import org.json4s.jackson.JsonMethods._
+import org.json4s.JsonDSL._
+
+//Setting up the kafka parameters. 
+
+var ssc = new StreamingContext(sc, Seconds(20))
+val kafkaParams = Map[String, Object](
+  "bootstrap.servers" -> "172.21.10.7:9092",
+  "key.deserializer" -> classOf[StringDeserializer],
+  "value.deserializer" -> classOf[StringDeserializer],
+  "group.id" -> "DFNQQYAAGZ",
+  "auto.offset.reset" -> "earliest",
+  "enable.auto.commit" -> (false: java.lang.Boolean)
+  )  
+  
+//Specifying the topic name.
+ 
+val topics =List("HEX").toSet
+val stream = KafkaUtils.createDirectStream[String, String](
+  ssc,
+  PreferConsistent,
+  Subscribe[String, String](topics, kafkaParams)
+)
+
+//Streaming DStream.
+
+val lines = stream.map(_.value())
+lines.print()
+lines.foreachRDD(rdd =>
+      rdd.foreachPartition(itr =>
+        while (itr!= null) {        
+          val record = itr.next().toString
+          val str2 = record.substring(0, record.length - 1).split("\"payload\":")(1).split(",")(0).split(":")(1).toInt
+          print(str2)
+          var metric: String = "harmonia.metric1"
+          val timestamp = new DateTime().getMillis / 1000
+          val symbol = "BP.L"
+          val body = f"""{
+                        |        "metric": "$metric",
+                        |        "timestamp": "$timestamp",
+                        |        "value": $str2,
+                        |        "tags": {"symbol": "$symbol"}
+                        |}""".stripMargin
+          var openTSDBUrl ="http://172.21.7.101:4242/api/put"   
+          try {
+            val httpClient = new DefaultHttpClient()
+            val post = new HttpPost(openTSDBUrl)
+            post.setHeader("Content-type",
+              "application/json")
+            post.setEntity(new
+                StringEntity(body)
+            )
+            httpClient.execute(post)
+
+          } catch {
+            case NonFatal(t) => {
+
+            }
+          }
+        }
+      )
+    )
+ ssc.start()
+ 
