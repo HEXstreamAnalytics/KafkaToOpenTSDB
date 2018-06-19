@@ -1,0 +1,170 @@
+import org.apache.spark._
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+import org.apache.spark.sql._
+import com.mapr.db._
+import com.mapr.db.spark._
+import com.mapr.db.spark.impl._
+import com.mapr.db.spark.sql._
+import org.apache.spark.rdd.RDD
+import com.mapr.db.spark.impl.OJAIDocument
+import org.apache.spark.sql.types.{StructType, StructField, StringType, IntegerType, LongType}
+import org.apache.spark.SparkContext
+import org.apache.spark.SparkConf
+import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.streaming.kafka09.ConsumerStrategies
+import org.apache.spark.streaming.kafka09.KafkaUtils
+import org.apache.spark.streaming.kafka09.LocationStrategies
+import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.spark.streaming.kafka09.KafkaUtils
+import org.apache.spark.streaming.kafka09.LocationStrategies.PreferConsistent
+import org.apache.spark.streaming.kafka09.ConsumerStrategies.Subscribe
+import org.apache.spark.storage.StorageLevel
+import org.apache.spark.SparkContext
+import kafka.serializer.StringDecoder
+import org.apache.spark.streaming.kafka09.{ConsumerStrategies, KafkaUtils, LocationStrategies}
+import org.apache.kafka.clients.consumer.ConsumerConfig
+import java.util.Properties
+import org.apache.spark.streaming.kafka.producer._
+import org.apache.kafka.clients.producer.ProducerConfig
+import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.clients.producer.KafkaProducer
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SaveMode
+import java.time.LocalDateTime
+import json
+import org.apache.spark._
+import sqlContext.implicits._
+import org.apache.spark.sql.SQLContext.implicits._
+import org.apache.spark.SparkContext
+import org.apache.spark.SparkConf
+import org.apache.spark.sql.Dataset
+import org.apache.spark.rdd.NewHadoopRDD
+import org.apache.hadoop.hbase.{HBaseConfiguration, HTableDescriptor}
+import org.apache.hadoop.hbase.{HConstants, HBaseConfiguration}
+import org.apache.hadoop.mapreduce.lib.input.{KeyValueTextInputFormat, TextInputFormat}
+import org.apache.hadoop.hbase.HBaseConfiguration
+import org.apache.hadoop.hbase.client.HBaseAdmin
+import org.apache.hadoop.hbase.client.{Put, Result}
+import org.apache.hadoop.hbase.client._
+import it.nerdammer.spark.hbase._
+import org.apache.hadoop.hbase.mapreduce.TableInputFormat
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.HColumnDescriptor
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.hbase.util.Bytes
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.mapred.TableOutputFormat
+import org.apache.hadoop.mapred.JobConf
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable
+import org.apache.hadoop.mapreduce.Job
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
+import org.apache.hadoop.hbase.KeyValue
+import org.apache.spark.sql.datasources.hbase._
+import org.apache.hadoop.io.Text
+import org.apache.spark.sql._
+import org.apache.hadoop.io._
+import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.spark.streaming.kafka09.KafkaUtils
+import org.apache.spark.streaming.kafka09.LocationStrategies.PreferConsistent
+import org.apache.spark.streaming.kafka09.ConsumerStrategies.Subscribe
+import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.storage.StorageLevel
+import org.apache.spark.SparkContext
+import org.apache.spark.streaming.kafka09.{ConsumerStrategies, KafkaUtils, LocationStrategies}
+import org.apache.kafka.clients.consumer.ConsumerConfig
+import java.util.Properties
+import org.apache.spark.streaming.kafka.producer._
+import org.apache.kafka.clients.producer.ProducerConfig
+import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.clients.producer.KafkaProducer
+import org.apache.spark.scheduler.SparkListener
+import org.apache.spark.scheduler.SparkListenerStageCompleted
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.SaveMode
+import org.json4s.jackson.JsonMethods.{compact, render}
+import scala.util.control.NonFatal
+import org.joda.time.DateTime
+import scala.util.control.NonFatal
+import org.apache.log4j.Logger
+import org.apache.spark.streaming.dstream.DStream
+import org.apache.http.client.methods.HttpPost
+import org.apache.http.entity.StringEntity
+import org.apache.http.impl.client.DefaultHttpClient
+import org.json4s._
+import org.json4s.jackson.JsonMethods._
+import org.json4s.JsonDSL._
+import org.apache.hadoop.conf.Configuration
+import org.apache.spark.rdd.RDD
+
+//Connection to Kafka parameters
+object SUPPLIER extends Serializable{
+  def main(args: Array[String]) {
+ // val sc = new SparkConf().setAppName("test")
+      val ssc = new StreamingContext(sc, Seconds(20))
+val kafkaParams = Map[String, Object](
+  "bootstrap.servers" -> "172.21.10.24:9092",
+  "key.deserializer" -> classOf[StringDeserializer],
+  "value.deserializer" -> classOf[StringDeserializer],
+  "group.id" -> "tqu99633",
+  "auto.offset.reset" -> "earliest",
+  "enable.auto.commit" -> (true: java.lang.Boolean)
+  )
+//Creating stream
+val topics =List("HEXSTREAM1").toSet
+val stream = KafkaUtils.createDirectStream[String, String](
+  ssc,
+  PreferConsistent,
+  Subscribe[String, String](topics, kafkaParams)
+)
+val lines = stream.map(_.value())
+lines.print()
+    lines.foreachRDD{rdd=>
+    rdd.foreachPartition(iter => {
+      val hConf = new HBaseConfiguration() 
+      val hTable = new HTable(hConf, "samplecustomer2") 
+    iter.foreach(record => {
+    //val i = +1
+   // val timestamp: Long = System.currentTimeMillis / 1000
+    //val id = timestamp.toString	
+     
+    val str1 = record.substring(0, record.length - 1).split("\"payload\":")(1).split(",")(0).split(":")(1)
+    val str2 = record.substring(0, record.length - 1).split("\"payload\":")(1).split(",")(1).split(":")(1)
+    val str3 = record.substring(0, record.length - 1).split("\"payload\":")(1).split(",")(2).split(":")(1)
+    val str4 = record.substring(0, record.length - 1).split("\"payload\":")(1).split(",")(3).split(":")(1)
+    val str5 = record.substring(0, record.length - 1).split("\"payload\":")(1).split(",")(4).split(":")(1)
+    val str6 = record.substring(0, record.length - 1).split("\"payload\":")(1).split(",")(5).split(":")(1)
+    val str7 = record.substring(0, record.length - 1).split("\"payload\":")(1).split(",")(6).split(":")(1)
+    val str8 = record.substring(0, record.length - 1).split("\"payload\":")(1).split(",")(7).split(":")(1)
+    val str9 = record.substring(0, record.length - 1).split("\"payload\":")(1).split(",")(8).split(":")(1)
+    val str10 = record.substring(0, record.length - 1).split("\"payload\":")(1).split(",")(9).split(":")(1)    
+    val str11 = record.substring(0, record.length - 1).split("\"payload\":")(1).split(",")(10).split(":")(1).split("}")(0)
+     
+     val id_con = str1+"_"+str2+"_"+str3
+     val id = id_con.toString
+    val thePut = new Put(Bytes.toBytes(id)) 
+    thePut.add(Bytes.toBytes("CUST"), Bytes.toBytes("CUST_ID"), Bytes.toBytes(str1))
+    thePut.add(Bytes.toBytes("CUST"), Bytes.toBytes("CUST_Fname"), Bytes.toBytes(str2))
+    thePut.add(Bytes.toBytes("CUST"), Bytes.toBytes("CUST_LNAME"), Bytes.toBytes(str3)) 
+    thePut.add(Bytes.toBytes("CUST"), Bytes.toBytes("CUST_PHONE"), Bytes.toBytes(str4))
+    thePut.add(Bytes.toBytes("CUST"), Bytes.toBytes("CUST_EMAIL"), Bytes.toBytes(str5))
+    thePut.add(Bytes.toBytes("CUST"), Bytes.toBytes("CUST_DETAILS"), Bytes.toBytes(str6))
+    thePut.add(Bytes.toBytes("CUST"), Bytes.toBytes("CUST_ADDR"), Bytes.toBytes(str7))
+    thePut.add(Bytes.toBytes("CUST"), Bytes.toBytes("CUST_CITY"), Bytes.toBytes(str8))
+    thePut.add(Bytes.toBytes("CUST"), Bytes.toBytes("CUST_STATE"), Bytes.toBytes(str9))
+    thePut.add(Bytes.toBytes("CUST"), Bytes.toBytes("CUST_ZIPCODE"), Bytes.toBytes(str10))
+    thePut.add(Bytes.toBytes("CUST"), Bytes.toBytes("CUST_COUNTRY"), Bytes.toBytes(str11))
+    
+    hTable.put(thePut);
+      })
+    })
+   }
+   ssc.start()
+   }
+}
